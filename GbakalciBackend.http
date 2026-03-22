@@ -1,0 +1,6 @@
+@GbakalciBackend_HostAddress = http://localhost:5155
+
+GET {{GbakalciBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
