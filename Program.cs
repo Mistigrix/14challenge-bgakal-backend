@@ -15,6 +15,13 @@ builder.Services.AddDbContext<MusicDbContext>(options =>
 
 var app = builder.Build();
 
+// Appliquer les migrations automatiquement au démarrage
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<MusicDbContext>();
+    db.Database.Migrate();
+}
+
 app.UseSwagger();
 app.UseSwaggerUI();
 
