@@ -1,0 +1,10 @@
+bin/
+obj/
+uploads/
+.git/
+.gitignore
+*.md
+*.user
+*.sln
+appsettings.Development.json
+Properties/launchSettings.json
