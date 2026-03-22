@@ -15,7 +15,8 @@ public class PlaylistsController : ControllerBase
         var playlists = await _db.Playlists
             .Include(p => p.PlaylistTracks).ThenInclude(pt => pt.Track).ThenInclude(t => t.Category)
             .ToListAsync();
-        return Ok(playlists.Select(MapToResponse));
+        var baseUrl = GetBaseUrl();
+        return Ok(playlists.Select(p => MapToResponse(p, baseUrl)));
     }
 
     [HttpGet("{id}")]
@@ -25,7 +26,7 @@ public class PlaylistsController : ControllerBase
             .Include(p => p.PlaylistTracks).ThenInclude(pt => pt.Track).ThenInclude(t => t.Category)
             .FirstOrDefaultAsync(p => p.Id == id);
         if (playlist == null) return NotFound();
-        return Ok(MapToResponse(playlist));
+        return Ok(MapToResponse(playlist, GetBaseUrl()));
     }
 
     [HttpPost]
@@ -34,7 +35,7 @@ public class PlaylistsController : ControllerBase
         var playlist = new Playlist { Name = request.Name };
         _db.Playlists.Add(playlist);
         await _db.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetById), new { id = playlist.Id }, MapToResponse(playlist));
+        return CreatedAtAction(nameof(GetById), new { id = playlist.Id }, MapToResponse(playlist, GetBaseUrl()));
     }
 
     [HttpPut("{id}")]
@@ -84,7 +85,9 @@ public class PlaylistsController : ControllerBase
         return NoContent();
     }
 
-    private static PlaylistResponse MapToResponse(Playlist playlist) => new()
+    private string GetBaseUrl() => $"{Request.Scheme}://{Request.Host}";
+
+    private static PlaylistResponse MapToResponse(Playlist playlist, string baseUrl) => new()
     {
         Id = playlist.Id,
         Name = playlist.Name,
@@ -97,8 +100,7 @@ public class PlaylistsController : ControllerBase
             Artist = pt.Track.Artist,
             Title = pt.Track.Title,
             Duration = pt.Track.Duration,
-            CoverUrl = pt.Track.Cover,
-            FileUrl = pt.Track.FilePath
+            CoverUrl = pt.Track.Cover != null ? $"{baseUrl}{pt.Track.Cover}" : null
         }).ToList()
     };
 }

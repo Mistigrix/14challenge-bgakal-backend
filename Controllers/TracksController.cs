@@ -22,7 +22,8 @@ public class TracksController : ControllerBase
         if (categoryId.HasValue)
             query = query.Where(t => t.CategoryId == categoryId.Value);
         var tracks = await query.ToListAsync();
-        return Ok(tracks.Select(MapToResponse));
+        var baseUrl = GetBaseUrl();
+        return Ok(tracks.Select(t => MapToResponse(t, baseUrl)));
     }
 
     [HttpGet("{id}")]
@@ -30,7 +31,35 @@ public class TracksController : ControllerBase
     {
         var track = await _db.Tracks.Include(t => t.Category).FirstOrDefaultAsync(t => t.Id == id);
         if (track == null) return NotFound();
-        return Ok(MapToResponse(track));
+        return Ok(MapToResponse(track, GetBaseUrl()));
+    }
+
+    // GET /api/tracks/{id}/audio  — retourne le fichier audio directement
+    [HttpGet("{id}/audio")]
+    public async Task<IActionResult> GetAudio(int id)
+    {
+        var track = await _db.Tracks.FindAsync(id);
+        if (track == null) return NotFound();
+
+        var relative = track.FilePath.TrimStart('/');
+        if (relative.StartsWith("uploads/")) relative = relative["uploads/".Length..];
+        var fullPath = Path.Combine(_uploadsPath, relative);
+
+        if (!System.IO.File.Exists(fullPath)) return NotFound("Fichier audio introuvable");
+
+        var contentType = Path.GetExtension(fullPath).ToLowerInvariant() switch
+        {
+            ".mp3" => "audio/mpeg",
+            ".wav" => "audio/wav",
+            ".ogg" => "audio/ogg",
+            ".flac" => "audio/flac",
+            ".aac" => "audio/aac",
+            ".m4a" => "audio/mp4",
+            _ => "application/octet-stream"
+        };
+
+        // enableRangeProcessing permet la lecture partielle (seek dans le player)
+        return PhysicalFile(fullPath, contentType, enableRangeProcessing: true);
     }
 
     // POST /api/tracks  (multipart/form-data)
@@ -62,7 +91,7 @@ public class TracksController : ControllerBase
         await _db.SaveChangesAsync();
         await _db.Entry(track).Reference(t => t.Category).LoadAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = track.Id }, MapToResponse(track));
+        return CreatedAtAction(nameof(GetById), new { id = track.Id }, MapToResponse(track, GetBaseUrl()));
     }
 
     // PUT /api/tracks/{id}  (multipart/form-data, tous les champs optionnels)
@@ -113,6 +142,8 @@ public class TracksController : ControllerBase
         return NoContent();
     }
 
+    private string GetBaseUrl() => $"{Request.Scheme}://{Request.Host}";
+
     private async Task<string> SaveFile(IFormFile file, string subfolder)
     {
         var ext = Path.GetExtension(file.FileName);
@@ -132,7 +163,7 @@ public class TracksController : ControllerBase
         if (System.IO.File.Exists(fullPath)) System.IO.File.Delete(fullPath);
     }
 
-    private static TrackResponse MapToResponse(Track track) => new()
+    private static TrackResponse MapToResponse(Track track, string baseUrl) => new()
     {
         Id = track.Id,
         CategoryId = track.CategoryId,
@@ -140,7 +171,6 @@ public class TracksController : ControllerBase
         Artist = track.Artist,
         Title = track.Title,
         Duration = track.Duration,
-        CoverUrl = track.Cover,
-        FileUrl = track.FilePath
+        CoverUrl = track.Cover != null ? $"{baseUrl}{track.Cover}" : null
     };
 }

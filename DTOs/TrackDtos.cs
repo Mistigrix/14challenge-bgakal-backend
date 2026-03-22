@@ -27,5 +27,4 @@ public class TrackResponse
     public string Title { get; set; } = string.Empty;
     public int Duration { get; set; }
     public string? CoverUrl { get; set; }
-    public string FileUrl { get; set; } = string.Empty;
 }
